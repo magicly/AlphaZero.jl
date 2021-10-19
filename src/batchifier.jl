@@ -15,6 +15,7 @@ The typical workflow should be the following:
 module Batchifier
 
 using ..AlphaZero: MCTS, Util, ProfUtils
+using Statistics
 
 export BatchedOracle
 
@@ -45,18 +46,29 @@ A query can be either:
 The server stops automatically after all workers send `:none`.
 """
 function launch_server(f; num_workers, batch_size)
+  println("batch_size: $batch_size, num_workers: $num_workers, infer threadid: $(Threads.threadid())")
   @assert batch_size <= num_workers
   channel = Channel(num_workers)
   # The server is spawned on the main thread for maximal responsiveness
   Util.@tspawn_main Util.@printing_errors begin
     num_active = num_workers
     pending = []
+
+    t0 = time()
+    total = 0
+    total_time = 0
+    wait_time = 0
+    do_time = 0
+    put_back_time=0
+    infer_ts = []
+
     while num_active > 0
       req = take!(channel)
       if req == :done
         num_active -= 1
         if num_active < batch_size
           batch_size = num_active
+          # println("====================batch size -1! $batch_size")
         end
       else
         push!(pending, req)
@@ -65,15 +77,39 @@ function launch_server(f; num_workers, batch_size)
       @assert batch_size <= num_active
       if length(pending) >= batch_size && length(pending) > 0
         batch = [p.query for p in pending]
+        t1 = time()
+        wait_time += t1 - t0
+        t2 = time()
         results = ProfUtils.log_event(;
             name="Infer (batch size: $(length(batch)))",
             cat="GPU", pid=0, tid=0) do
           f(batch)
         end
+        t3 = time()
+        do_time += t3 - t2
+
+        append!(infer_ts, t3 - t2)
+        if length(infer_ts) % 1000 == 0
+          n = 1000
+          ts = infer_ts[max(end-n, 1):end]
+          println("=============infer_ts====recent===== $(maximum(ts)/batch_size), $(minimum(ts)/batch_size), $(mean(ts)/batch_size)")
+        end
+
+        t3 = time()
         for i in eachindex(pending)
           put!(pending[i].answer_channel, results[i])
         end
         empty!(pending)
+        t4 = time()
+        put_back_time += t4 - t3
+
+        total_time += t4 - t0
+        total += 1
+        if length(infer_ts) % 1000 == 0
+            println("avg time per sample: $(do_time / total / batch_size)")
+            println("wait_time: $wait_time, do_time: $do_time, put_back_time: $put_back_time, total_time: $total_time, $(do_time/ total_time)")
+        end
+        t0 = time()
       end
     end
   end

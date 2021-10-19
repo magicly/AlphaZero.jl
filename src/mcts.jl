@@ -236,7 +236,7 @@ end
 
 Run `nsims` MCTS simulations from the current state.
 """
-function explore!(env::Env, game, nsims)
+function explore0!(env::Env, game, nsims)
   η = dirichlet_noise(game, env.noise_α)
   for i in 1:nsims
     env.total_simulations += 1
@@ -270,6 +270,98 @@ function policy(env::Env, game)
   return actions, π
 end
 
+mutable struct Node{Action}
+  parent::Union{Node,Nothing}
+  children::Vector{Node}
+
+  action::Action
+  n::Int
+  P::Float32 # Prior probability as given by the oracle
+  reward::Float32
+
+  function Node(parent, action, P=1.0, reward=0.)
+    new{typeof(action)}(parent, [], action, 0, P, reward)
+  end
+end
+function expand!(env::Env, node::Node, game)
+    state = GI.current_state(game)
+    P0, V = env.oracle(state)
+    P = Util.apply_temperature(P0, env.prior_temperature)
+    actions = GI.available_actions(game)
+
+    for (action, p) in zip(actions, P)
+      child_node = Node(node, action, p)
+      push!(node.children,  child_node)
+    end
+    V
+end
+function backup!(node::Node, reward)
+    if node.parent !== nothing
+        backup!(node.parent, -reward)
+    end
+
+    node.n += 1
+    node.reward += reward
+end
+
+function select(node::Node, cpuct, ϵ, η)
+  scores = map(enumerate(node.children)) do  (i, a)
+    q = a.reward / max(a.n, 1)
+    prob = iszero(ϵ) ? a.P : (1 - ϵ) * a.P + ϵ * η[i]
+    explore = cpuct * prob * √(node.n) / (1 + a.n)
+    q + explore
+  end
+  action_id = argmax(scores)
+  node.children[action_id]
+end
+
+function isLeaf(node::Node)
+  return length(node.children) == 0
+end
+
+function simulate!(env::Env, game, root::Node; η)
+    node = root
+    # select
+    while true
+        if isLeaf(node)
+          break
+        end
+        ϵ = node == root ? env.noise_ϵ : 0.
+        node = select(node, env.cpuct, ϵ, η)
+        GI.play!(game, node.action)
+        env.total_nodes_traversed += 1
+    end
+
+    leaf_value = 0.
+    # expand
+    if GI.game_terminated(game)
+        leaf_value = GI.white_reward(game)
+        wp = GI.white_playing(game)
+        leaf_value = wp ? leaf_value : -leaf_value
+    else
+        leaf_value = expand!(env, node, game)
+        env.total_nodes_traversed += 1
+    end
+
+    # backup
+    backup!(node, -leaf_value)
+end
+
+        
+function explore!(env::Env, game, nsims, episode=1)
+  η = dirichlet_noise(game, env.noise_α)
+  root = Node(nothing, 0)
+  for i in 1:nsims
+    env.total_simulations += 1
+    simulate!(env, GI.clone(game), root, η=η) 
+  end
+
+  # to keep the API same
+  state = GI.current_state(game)
+  info, new_node = state_info(env, state)
+  states = [ActionStats(0, 0, c.n) for c in root.children]
+  env.tree[state] = StateInfo(states, 0.)
+end
 """
     MCTS.reset!(env)
 
