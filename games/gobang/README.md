@@ -1,0 +1,3 @@
+# Gobang
+
+Gobang game.
