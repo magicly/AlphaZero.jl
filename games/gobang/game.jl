@@ -1,13 +1,13 @@
 import AlphaZero.GI
 using StaticArrays
 
-const BOARD_SIDE = 12
+const BOARD_SIDE = 15
 const N_IN_ROW = 5
 const NUM_POSITIONS = BOARD_SIDE^2
 
 const Player = UInt8
-const WHITE = 0x01
-const BLACK = 0x02
+const BLACK = 0x01
+const WHITE = 0x02
 
 other(p::Player) = 0x03 - p
 
@@ -31,10 +31,11 @@ mutable struct GameEnv <: GI.AbstractGameEnv
   finished::Bool
   winner::Player
   amask::Vector{Bool} # actions mask
+  last_pos::Int
 end
 
 function GameEnv(g::GameEnv)
-  GameEnv(copy(g.board), g.curplayer, g.finished, g.winner, copy(g.amask))
+  GameEnv(copy(g.board), g.curplayer, g.finished, g.winner, copy(g.amask), g.last_pos)
 end
 
 function GI.init(::GameSpec)
@@ -45,7 +46,7 @@ function GI.init(::GameSpec)
   # amask = trues(NUM_POSITIONS) # 96, 但是g.amask == 265
   amask = ones(Bool, NUM_POSITIONS)
   # println("amask size: $(Base.summarysize(amask))")
-  g = GameEnv(board, curplayer, finished, winner, amask)
+  g = GameEnv(board, curplayer, finished, winner, amask, 0)
   # println(11111, Base.summarysize(g))
   g
 end
@@ -69,7 +70,21 @@ function GI.vectorize_state(::GameSpec, state)
   board = state.board
   player = state.curplayer
   player2 = other(player)
-  boards = zeros(Float32, BOARD_SIDE, BOARD_SIDE, 2)
+
+  # obsv = zeros(Float32, BOARD_SIDE, BOARD_SIDE, 5)
+  # obsv[:, :, 1] = board .== EMPTY
+  # obsv[:, :, 2] = board .== BLACK
+  # obsv[:, :, 3] = board .== WHITE
+  # obsv[:, :, 4] .= player
+  # if state.last_pos != 0
+  #   obsv[:, :, 5][state.last_pos] = 1
+  # end
+  # return obsv
+
+
+
+
+  boards = zeros(Float32, BOARD_SIDE, BOARD_SIDE, 4)
   for j = 1:BOARD_SIDE
     for i = 1:BOARD_SIDE
       if board[i, j] == player
@@ -78,6 +93,10 @@ function GI.vectorize_state(::GameSpec, state)
         boards[i, j, 2] = 1
       end
     end
+  end
+  boards[:, :, 3] .= player
+  if state.last_pos != 0
+    boards[:, :, 4][state.last_pos] = 1
   end
   return boards
 end
@@ -94,10 +113,11 @@ function GI.set_state!(g::GameEnv, state)
   g.finished = state.finished
   g.winner = state.winner
   g.amask = copy(state.amask) # TODO why
+  g.last_pos = state.last_pos
 end
 
 # GI.current_state(g::GameEnv) = (board = copy(g.board), curplayer = g.curplayer, finished = g.finished, winner = g.winner, amask = copy(g.amask))
-GI.current_state(g::GameEnv) = (board = g.board, curplayer = g.curplayer, finished = g.finished, winner = g.winner, amask = copy(g.amask))
+GI.current_state(g::GameEnv) = (board = g.board, curplayer = g.curplayer, finished = g.finished, winner = g.winner, amask = copy(g.amask), last_pos=g.last_pos)
 
 GI.game_terminated(g::GameEnv) = g.finished
 
@@ -109,6 +129,7 @@ function GI.play!(g::GameEnv, pos)
   g.board = setindex(g.board, g.curplayer, pos)
   # g.board[pos] = g.curplayer # setindex! is not defined
   g.amask[pos] = false
+  g.last_pos = pos
   if winning_pattern_at(g.board, g.curplayer, pos)
     g.winner = g.curplayer
     g.finished = true

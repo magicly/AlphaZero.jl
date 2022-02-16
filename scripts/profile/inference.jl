@@ -19,9 +19,11 @@ Estimate inference time in μs/sample.
 function profile_inference(
     exp::Experiment = Examples.experiments["connect-four"];
     on_gpu=true,
-    nrep=100,
+    nrep=1000,
     batch_size=128,
     num_filters=64)
+
+  println("batch_size: $batch_size")
 
   params = exp.netparams
   params = @set params.num_filters = num_filters
@@ -44,11 +46,11 @@ function plot_inference_speedup(
   on_gpu=true,
   num_filters=64)
 
-  N = 8
+  N = 10
   batch_sizes = [2^i for i in 0:N]
   ts = [
     profile_inference(exp;
-      nrep=10,
+      nrep=200,
       num_filters, batch_size, on_gpu)
     for batch_size in batch_sizes ]
 
@@ -64,8 +66,8 @@ function plot_inference_speedup(
 end
 
 function all_plots()
-  plot_inference_speedup("inference-gpu-64.png",  on_gpu=true,  num_filters=64)
-  plot_inference_speedup("inference-cpu-64.png",  on_gpu=false, num_filters=64)
+  # plot_inference_speedup("inference-gpu-64.png",  on_gpu=true,  num_filters=64)
+  # plot_inference_speedup("inference-cpu-64.png",  on_gpu=false, num_filters=64)
   plot_inference_speedup("inference-gpu-128.png", on_gpu=true,  num_filters=128)
-  plot_inference_speedup("inference-cpu-128.png", on_gpu=false, num_filters=128)
+  # plot_inference_speedup("inference-cpu-128.png", on_gpu=false, num_filters=128)
 end

@@ -22,7 +22,7 @@ self_play = SelfPlayParams(
     cpuct=2.0,
     temperature=ConstSchedule(1.0),
     dirichlet_noise_ϵ=0.25,
-    dirichlet_noise_α=1.0))
+    dirichlet_noise_α=0.1)) # 10 / length(legal actions)
 
 arena = ArenaParams(
   sim=SimParams(
@@ -49,23 +49,26 @@ learning = LearningParams(
     lr_low=1e-3,
     momentum_high=0.9,
     momentum_low=0.8),
-  batch_size=32,
+  batch_size=32*4,
   loss_computation_batch_size=2048,
   nonvalidity_penalty=1.,
   min_checkpoints_per_epoch=0,
-  max_batches_per_checkpoint=5_000,
+  max_batches_per_checkpoint=5_00,
   num_checkpoints=1)
 
 params = Params(
   arena=arena,
   self_play=self_play,
   learning=learning,
-  num_iters=15,
+  num_iters=25,
   memory_analysis=MemAnalysisParams(
     num_game_stages=4),
   ternary_rewards=true,
   use_symmetries=false,
-  mem_buffer_size=PLSchedule(80_000))
+  mem_buffer_size=PLSchedule(
+  [      0,        25],
+  [400_000, 1_000_000]))
+  # mem_buffer_size=PLSchedule(40_000))
 
 benchmark_sim = SimParams(
   arena.sim;

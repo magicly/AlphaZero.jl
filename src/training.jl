@@ -281,7 +281,7 @@ function self_play_step!(env::Env, handler)
     return MctsPlayer(env.gspec, oracle, params.mcts)
   end
   # Run the simulations
-  results, elapsed = @timed simulate_distributed(
+  results, elapsed = @timed simulate(
     simulator, env.gspec, params.sim,
     game_simulated=()->Handlers.game_played(handler))
   # Add the collected samples in memory

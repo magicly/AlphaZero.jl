@@ -77,8 +77,8 @@ end
 
 struct ActionStats
   P :: Float32 # Prior probability as given by the oracle
-  W :: Float64 # Cumulated Q-value for the action (Q = W/N)
-  N :: Int # Number of times the action has been visited
+  W :: Float32 # Cumulated Q-value for the action (Q = W/N)
+  N :: Int32 # Number of times the action has been visited
 end
 
 struct StateInfo
@@ -264,6 +264,7 @@ function policy(env::Env, game)
         rethrow(e)
       end
     end
+  empty!(env.tree) # GC
   Ntot = sum(a.N for a in info.stats)
   π = [a.N / Ntot for a in info.stats]
   π ./= sum(π)
@@ -275,7 +276,7 @@ mutable struct Node{Action}
   children::Vector{Node}
 
   action::Action
-  n::Int
+  n::Int32
   P::Float32 # Prior probability as given by the oracle
   reward::Float32
 
@@ -367,9 +368,15 @@ end
 
 Empty the MCTS tree.
 """
+total_reset = 0
 function reset!(env)
-  empty!(env.tree)
-  #GC.gc(true)
+  global total_reset
+  empty!(env.tree) 
+  total_reset += 1
+  if (total_reset % 10 == 0) # TODO 居然有效， julia为啥不自己GC？！
+    println("============in mcts reset! $total_reset")
+    GC.gc(true)
+  end
 end
 
 #####

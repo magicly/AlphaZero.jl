@@ -172,6 +172,7 @@ function mapreduce(make_worker, args, num_workers, combine, init)
   lock = ReentrantLock()
   tasks = []
   nbg = Threads.nthreads() - 1
+  nbg = 4
   for i in 1:num_workers
     tid = nbg > 0 ? 2 + ((i - 1) % nbg) : 1
     task = ThreadPools.@tspawnat tid Util.@printing_errors begin

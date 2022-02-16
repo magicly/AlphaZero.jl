@@ -195,11 +195,11 @@ end
 
 function think(p::MctsPlayer, game)
   if isnothing(p.timeout) # Fixed number of MCTS simulations
-    MCTS.explore!(p.mcts, game, p.niters)
+    MCTS.explore0!(p.mcts, game, p.niters)
   else # Run simulations until timeout
     start = time()
     while time() - start < p.timeout
-      MCTS.explore!(p.mcts, game, p.niters)
+      MCTS.explore0!(p.mcts, game, p.niters)
     end
   end
   return MCTS.policy(p.mcts, game)

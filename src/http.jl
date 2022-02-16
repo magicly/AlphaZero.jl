@@ -5,7 +5,7 @@ using AlphaZero
 
 const BOARD_SIDE = 12
 experiment = Examples.experiments["gobang"];
-session = Session(experiment, dir="sessions/go-1110-1");
+session = Session(experiment, dir="sessions/go-1230-1");
 
 player = AlphaZeroPlayer(session)
 

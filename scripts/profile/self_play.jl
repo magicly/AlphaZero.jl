@@ -53,7 +53,7 @@ function chrome_tracing()
 end
 
 function flame_graph()
-  profile_self_play() # Compilation
+  # profile_self_play() # Compilation
   Profile.init(n=10^8, delay=0.01)
   Profile.clear()
   @profile profile_self_play()
@@ -63,7 +63,7 @@ function flame_graph()
 end
 
 # full_profile()
-chrome_tracing()
+# chrome_tracing()
 
 # Num cores experiments
 # 1: 203s / 13% GC
